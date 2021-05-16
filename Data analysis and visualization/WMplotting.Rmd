@@ -1,0 +1,1096 @@
+---
+title: "WMplotting"
+author: "Alana"
+date: "2020/7/6"
+output: word_document
+---
+
+```{r setup, include=FALSE,}
+knitr::opts_chunk$set(echo = TRUE,eval=FALSE)
+```
+## Plots for visualization of output from runmod_random.m
+The output file I used here is the output from original runmod_random.m Hua sent, with 18 columns. It includes five dimensions (Behaviour variable, day, trial, replication, pset), value, and 12 parameters. Including all these data would make the coding easier and more flexible.
+### Distance based model Fixed platform
+```{r}
+# fixed platform
+# Regression on fixed platform with trial ~ behavioural variable 
+fixed1<-read.csv("/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/distance_based_model_random_simulation/output_fixed_1000trial.csv",header = F)
+header = c('Behaviour_variable','Day','Trial','pset','value')
+colnames(fixed1)=header  
+  
+mean_rep<-aggregate(value~Behaviour_variable+Day+Trial+pset,data=fixed1,FUN='mean')
+sd_rep<-aggregate(value~Behaviour_variable+Day+Trial+pset,data=fixed1,FUN='sd')
+mean_sd<-data.frame(mean_rep,sd_rep$value)
+names(mean_sd)[names(mean_sd) =="value"] <-"mean"
+names(mean_sd)[names(mean_sd) =="sd_rep.value"] <-"sd"
+
+bv<-c( 'latency', 'distance', 'target quadrant', 'opposite quadrant','wall zone','speed_std','mean_angle','time step')
+library(ggpubr) # for ggsave function
+library(ggplot2)
+
+# Calculate trial number by using 'Day' and 'Trial' in the output. E.g. Day2-Trial2 => the 6th trial
+day_trial<-(mean_sd$Day-1)*4+mean_sd$Trial
+mean_sd<-data.frame(mean_sd,day_trial)
+plotbox<-list()
+plotline<-list()
+# Boxplot with regression line for trial
+for (i in 1:8){
+  ss<-mean_sd[which(mean_sd$Behaviour_variable==i),]
+  # linear regression
+  l<-lm(ss$mean~ss$day_trial)
+  plotbox[[i]]<-ggplot(ss,aes(x=day_trial,y=mean,group=day_trial))+
+    geom_boxplot()+
+    #geom_abline(slope = l$coefficients[[2]],intercept = l$coefficients[[1]],color='red')+ # add regression line
+    labs(x="Trial",y=bv[i]) # add labels
+}
+
+# calculate the means over replicates (the mean of data with same Behaviour_variable&Day&Trial)
+mm<-aggregate(mean~Behaviour_variable+Day+Trial,data = mean_sd,FUN='mean')
+# calculate the standard deviation
+mm_sd<-aggregate(mean~Behaviour_variable+Day+Trial,data = mean_sd,FUN='sd')
+# combine mean and sd into the same data frame
+mm<-data.frame(mm,mm_sd$mean)
+# change column name
+names(mm)[names(mm)=="mm_sd.mean"]<-'sd'
+
+# Calculate trial number by using 'Day' and 'Trial'
+day_trial2<-(mm$Day-1)*4+mm$Trial
+mm<-data.frame(mm,day_trial2)
+
+# plot line chart with regression line
+for (i in 1:8){
+  ss2<-mm[which(mm$Behaviour_variable==i),]
+  l1<-lm(ss2$mean~ss2$day_trial2)
+  plotline[[i]]<-ggplot(ss2,aes(x=day_trial2,y=mean))+
+    geom_line(key_glyph = draw_key_abline) + 
+  geom_point(size=1, key_glyph = draw_key_point) + 
+  geom_errorbar(aes(ymin = mean - sd/2, ymax = mean + sd/2), width = 0.1, key_glyph = draw_key_blank, linetype=2)+
+    #geom_smooth()+
+    #geom_abline(slope = l1$coefficients[[2]],intercept = l1$coefficients[[1]],color='red')+
+    labs(x="Trial",y=bv[i],subtitle =  paste("R2=",round(summary(l1)$r.squared,4),                                                "p.val=",round(summary(l1)$coefficients[8],4)))+
+    theme_classic()
+}
+
+library(ggpubr)
+setwd("/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/distance_based_model_random_simulation/")
+ggsave(filename="Line_Trial~Behaviour_distance_model_fixed_platform.png",plot=ggarrange(plotlist = plotline))
+ggsave(filename="Box_Trial~Behaviour_distance_model_fixed_platform.png",plot=ggarrange(plotlist = plotbox))
+ggsave(filename = paste(colnames(fixed1)[j],'.png'),plot=ggarrange(plotlist=plot))
+```
+### By day
+```{r}
+# calculate the means over replicates (the mean of data with same Behaviour_variable&Day&Trial)
+mm<-aggregate(mean~Behaviour_variable+Day,data = mean_sd,FUN='mean')
+# calculate the standard deviation
+mm_sd<-aggregate(mean~Behaviour_variable+Day,data = mean_sd,FUN='sd')
+# combine mean and sd into the same data frame
+mm<-data.frame(mm,mm_sd$mean)
+# change column name
+names(mm)[names(mm)=="mm_sd.mean"]<-'sd'
+
+# plot line chart with regression line
+for (i in 1:8){
+  ss2<-mm[which(mm$Behaviour_variable==i),]
+  l1<-lm(ss2$mean~ss2$Day)
+  plotline[[i]]<-ggplot(ss2,aes(x=Day,y=mean))+
+    geom_line(key_glyph = draw_key_abline) + 
+  geom_point(size=1, key_glyph = draw_key_point) + 
+  geom_errorbar(aes(ymin = mean - sd/2, ymax = mean + sd/2), width = 0.1, key_glyph = draw_key_blank, linetype=2)+
+    #geom_smooth()+
+    #geom_abline(slope = l1$coefficients[[2]],intercept = l1$coefficients[[1]],color='red')+
+    labs(x="Day",y=bv[i],subtitle =  paste("R2=",round(summary(l1)$r.squared,4),                                                "p.val=",round(summary(l1)$coefficients[8],4)))+
+    theme_classic()
+}
+
+library(ggpubr)
+marrangeGrob(grobs = plotline,nrow = 4,ncol = 2)%>%
+  ggsave(paste('/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/data/Line_by_day_Trial~Behaviour_distance_model_fixed_platform.pdf'),
+         plot=.,width = 8,height = 10,device = 'pdf',dpi = 300)
+
+```
+
+
+### Distance based model Variable platform
+```{r}
+# vairable platform
+# Regression on fixed platform with trial ~ behavioural variable 
+variable1<-read.csv("/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/distance_based_model_random_simulation/output_variable_1000trial.csv",header = F)
+header = c('Behaviour_variable','Day','Trial','pset','value')
+colnames(variable1)=header  
+  
+mean_rep<-aggregate(value~Behaviour_variable+Day+Trial+pset,data=variable1,FUN='mean')
+sd_rep<-aggregate(value~Behaviour_variable+Day+Trial+pset,data=variable1,FUN='sd')
+mean_sd<-data.frame(mean_rep,sd_rep$value)
+names(mean_sd)[names(mean_sd) =="value"] <-"mean"
+names(mean_sd)[names(mean_sd) =="sd_rep.value"] <-"sd"
+
+bv<-c( 'latency', 'distance', 'target quadrant', 'opposite quadrant','wall zone','speed_std','mean_angle','time step')
+library(ggpubr) # for ggsave function
+library(ggplot2)
+
+# Calculate trial number by using 'Day' and 'Trial' in the output. E.g. Day2-Trial2 => the 6th trial
+day_trial<-(mean_sd$Day-1)*4+mean_sd$Trial
+mean_sd<-data.frame(mean_sd,day_trial)
+plotbox<-list()
+plotline<-list()
+# Boxplot with regression line for trial
+for (i in 1:8){
+  ss<-mean_sd[which(mean_sd$Behaviour_variable==i),]
+  # linear regression
+  l<-lm(ss$mean~ss$day_trial)
+  plotbox[[i]]<-ggplot(ss,aes(x=day_trial,y=mean,group=day_trial))+
+    geom_boxplot()+
+    #geom_abline(slope = l$coefficients[[2]],intercept = l$coefficients[[1]],color='red')+ # add regression line
+    labs(x="Trial",y=bv[i]) # add labels
+}
+
+# calculate the means over replicates (the mean of data with same Behaviour_variable&Day&Trial)
+mm<-aggregate(mean~Behaviour_variable+Day+Trial,data = mean_sd,FUN='mean')
+# calculate the standard deviation
+mm_sd<-aggregate(mean~Behaviour_variable+Day+Trial,data = mean_sd,FUN='sd')
+# combine mean and sd into the same data frame
+mm<-data.frame(mm,mm_sd$mean)
+# change column name
+names(mm)[names(mm)=="mm_sd.mean"]<-'sd'
+
+# Calculate trial number by using 'Day' and 'Trial'
+day_trial2<-(mm$Day-1)*4+mm$Trial
+mm<-data.frame(mm,day_trial2)
+
+# plot line chart with regression line
+for (i in 1:8){
+  ss2<-mm[which(mm$Behaviour_variable==i),]
+  l1<-lm(ss2$mean~ss2$day_trial2)
+  plotline[[i]]<-ggplot(ss2,aes(x=day_trial2,y=mean))+
+    geom_line(key_glyph = draw_key_abline) + 
+  geom_point(size=1, key_glyph = draw_key_point) + 
+  geom_errorbar(aes(ymin = mean - sd/2, ymax = mean + sd/2), width = 0.1, key_glyph = draw_key_blank, linetype=2)+
+    #geom_smooth()+
+    #geom_abline(slope = l1$coefficients[[2]],intercept = l1$coefficients[[1]],color='red')+
+    labs(x="Trial",y=bv[i],subtitle =  paste("R2=",round(summary(l1)$r.squared,4),                                                "p.val=",round(summary(l1)$coefficients[8],4)))+
+    theme_classic()
+}
+
+library(ggpubr)
+setwd("/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/distance_based_model_random_simulation/")
+ggsave(filename="Trial~Behaviour_distance_model_variable_platform.png",plot=ggarrange(plotlist = plotline))
+ggsave(filename = paste(colnames(fixed1)[j],'.png'),plot=ggarrange(plotlist=plot))
+```
+### By day
+```{r}
+# calculate the means over replicates (the mean of data with same Behaviour_variable&Day&Trial)
+mm<-aggregate(mean~Behaviour_variable+Day,data = mean_sd,FUN='mean')
+# calculate the standard deviation
+mm_sd<-aggregate(mean~Behaviour_variable+Day,data = mean_sd,FUN='sd')
+# combine mean and sd into the same data frame
+mm<-data.frame(mm,mm_sd$mean)
+# change column name
+names(mm)[names(mm)=="mm_sd.mean"]<-'sd'
+
+# plot line chart with regression line
+for (i in 1:8){
+  ss2<-mm[which(mm$Behaviour_variable==i),]
+  l1<-lm(ss2$mean~ss2$Day)
+  plotline[[i]]<-ggplot(ss2,aes(x=Day,y=mean))+
+    geom_line(key_glyph = draw_key_abline) + 
+  geom_point(size=1, key_glyph = draw_key_point) + 
+  geom_errorbar(aes(ymin = mean - sd/2, ymax = mean + sd/2), width = 0.1, key_glyph = draw_key_blank, linetype=2)+
+    #geom_smooth()+
+    #geom_abline(slope = l1$coefficients[[2]],intercept = l1$coefficients[[1]],color='red')+
+    labs(x="Day",y=bv[i],subtitle =  paste("R2=",round(summary(l1)$r.squared,4),                                                "p.val=",round(summary(l1)$coefficients[8],4)))+
+    theme_classic()
+}
+
+library(ggpubr)
+marrangeGrob(grobs = plotline,nrow = 4,ncol = 2)%>%
+  ggsave(paste('/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/data/Line_by_day_Trial~Behaviour_distance_model_variable_platform.pdf'),
+         plot=.,width = 8,height = 10,device = 'pdf',dpi = 300)
+
+```
+
+### Place based model Fixed platform
+```{r}
+# fixed platform
+# Regression on fixed platform with trial ~ behavioural variable 
+fixed2<-read.csv("/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/place_cell_based_model_simulation/output_fix_1000trial.csv",header = F)
+header = c('Behaviour_variable','Day','Trial','pset','value')
+colnames(fixed2)=header  
+  
+mean_rep<-aggregate(value~Behaviour_variable+Day+Trial+pset,data=fixed2,FUN='mean')
+sd_rep<-aggregate(value~Behaviour_variable+Day+Trial+pset,data=fixed2,FUN='sd')
+mean_sd<-data.frame(mean_rep,sd_rep$value)
+names(mean_sd)[names(mean_sd) =="value"] <-"mean"
+names(mean_sd)[names(mean_sd) =="sd_rep.value"] <-"sd"
+
+bv<-c( 'latency', 'distance', ' quandrant4', 'quadrant2','wall zone','speed_std','mean_angle','time step')
+library(ggpubr) # for ggsave function
+library(ggplot2)
+
+# Calculate trial number by using 'Day' and 'Trial' in the output. E.g. Day2-Trial2 => the 6th trial
+day_trial<-(mean_sd$Day-1)*4+mean_sd$Trial
+mean_sd<-data.frame(mean_sd,day_trial)
+plotbox<-list()
+plotline<-list()
+# Boxplot with regression line for trial
+for (i in 1:8){
+  ss<-mean_sd[which(mean_sd$Behaviour_variable==i),]
+  # linear regression
+  l<-lm(ss$mean~ss$day_trial)
+  plotbox[[i]]<-ggplot(ss,aes(x=day_trial,y=mean,group=day_trial))+
+    geom_boxplot()+
+    #geom_abline(slope = l$coefficients[[2]],intercept = l$coefficients[[1]],color='red')+ # add regression line
+    labs(x="Trial",y=bv[i]) # add labels
+}
+
+# calculate the means over replicates (the mean of data with same Behaviour_variable&Day&Trial)
+mm<-aggregate(mean~Behaviour_variable+Day+Trial,data = mean_sd,FUN='mean')
+# calculate the standard deviation
+mm_sd<-aggregate(mean~Behaviour_variable+Day+Trial,data = mean_sd,FUN='sd')
+# combine mean and sd into the same data frame
+mm<-data.frame(mm,mm_sd$mean)
+# change column name
+names(mm)[names(mm)=="mm_sd.mean"]<-'sd'
+
+# Calculate trial number by using 'Day' and 'Trial'
+day_trial2<-(mm$Day-1)*4+mm$Trial
+mm<-data.frame(mm,day_trial2)
+
+# plot line chart with regression line
+for (i in 1:8){
+  ss2<-mm[which(mm$Behaviour_variable==i),]
+  l1<-lm(ss2$mean~ss2$day_trial2)
+  plotline[[i]]<-ggplot(ss2,aes(x=day_trial2,y=mean))+
+    geom_line(key_glyph = draw_key_abline) + 
+  geom_point(size=1, key_glyph = draw_key_point) + 
+  geom_errorbar(aes(ymin = mean - sd/2, ymax = mean + sd/2), width = 0.1, key_glyph = draw_key_blank, linetype=2)+
+    #geom_smooth()+
+    #geom_abline(slope = l1$coefficients[[2]],intercept = l1$coefficients[[1]],color='red')+
+    labs(x="Trial",y=bv[i],subtitle =  paste("R2=",round(summary(l1)$r.squared,4),                                                "p.val=",round(summary(l1)$coefficients[8],4)))+
+    theme_classic()
+}
+
+library(ggpubr)
+setwd("/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/place_cell_based_model_simulation/")
+ggsave(filename="Line_Trial~Behaviour_placecell_model_fixed_platform.png",plot=ggarrange(plotlist = plotline))
+ggsave(filename="Box_Trial~Behaviour_distance_model_fixed_platform.png",plot=ggarrange(plotlist = plotbox))
+ggsave(filename = paste(colnames(fixed1)[j],'.png'),plot=ggarrange(plotlist=plot))
+```
+### By day
+```{r}
+# calculate the means over replicates (the mean of data with same Behaviour_variable&Day&Trial)
+mm<-aggregate(mean~Behaviour_variable+Day,data = mean_sd,FUN='mean')
+# calculate the standard deviation
+mm_sd<-aggregate(mean~Behaviour_variable+Day,data = mean_sd,FUN='sd')
+# combine mean and sd into the same data frame
+mm<-data.frame(mm,mm_sd$mean)
+# change column name
+names(mm)[names(mm)=="mm_sd.mean"]<-'sd'
+
+# plot line chart with regression line
+for (i in 1:8){
+  ss2<-mm[which(mm$Behaviour_variable==i),]
+  l1<-lm(ss2$mean~ss2$Day)
+  plotline[[i]]<-ggplot(ss2,aes(x=Day,y=mean))+
+    geom_line(key_glyph = draw_key_abline) + 
+  geom_point(size=1, key_glyph = draw_key_point) + 
+  geom_errorbar(aes(ymin = mean - sd/2, ymax = mean + sd/2), width = 0.1, key_glyph = draw_key_blank, linetype=2)+
+    #geom_smooth()+
+    #geom_abline(slope = l1$coefficients[[2]],intercept = l1$coefficients[[1]],color='red')+
+    labs(x="Day",y=bv[i],subtitle =  paste("R2=",round(summary(l1)$r.squared,4),                                                "p.val=",round(summary(l1)$coefficients[8],4)))+
+    theme_classic()
+}
+
+library(ggpubr)
+marrangeGrob(grobs = plotline,nrow = 4,ncol = 2)%>%
+  ggsave(paste('/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/data/Line_by_day_Trial~Behaviour_place_model_fixed_platform.pdf'),
+         plot=.,width = 8,height = 10,device = 'pdf',dpi = 300)
+
+```
+
+### Place based model Variable platform
+```{r}
+# vairable platform
+# Regression on fixed platform with trial ~ behavioural variable 
+variable2<-read.csv("/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/place_cell_based_model_simulation/output_variable_1000trial.csv",header = F)
+header = c('Behaviour_variable','Day','Trial','pset','value')
+colnames(variable2)=header  
+  
+mean_rep<-aggregate(value~Behaviour_variable+Day+Trial+pset,data=variable2,FUN='mean')
+sd_rep<-aggregate(value~Behaviour_variable+Day+Trial+pset,data=variable2,FUN='sd')
+mean_sd<-data.frame(mean_rep,sd_rep$value)
+names(mean_sd)[names(mean_sd) =="value"] <-"mean"
+names(mean_sd)[names(mean_sd) =="sd_rep.value"] <-"sd"
+
+bv<-c( 'latency', 'distance', ' quandrant4', 'quadrant2','wall zone','speed_std','mean_angle','time step')
+library(ggpubr) # for ggsave function
+library(ggplot2)
+
+# Calculate trial number by using 'Day' and 'Trial' in the output. E.g. Day2-Trial2 => the 6th trial
+day_trial<-(mean_sd$Day-1)*4+mean_sd$Trial
+mean_sd<-data.frame(mean_sd,day_trial)
+plotbox<-list()
+plotline<-list()
+# Boxplot with regression line for trial
+for (i in 1:8){
+  ss<-mean_sd[which(mean_sd$Behaviour_variable==i),]
+  # linear regression
+  l<-lm(ss$mean~ss$day_trial)
+  plotbox[[i]]<-ggplot(ss,aes(x=day_trial,y=mean,group=day_trial))+
+    geom_boxplot()+
+    #geom_abline(slope = l$coefficients[[2]],intercept = l$coefficients[[1]],color='red')+ # add regression line
+    labs(x="Trial",y=bv[i]) # add labels
+}
+
+# calculate the means over replicates (the mean of data with same Behaviour_variable&Day&Trial)
+mm<-aggregate(mean~Behaviour_variable+Day+Trial,data = mean_sd,FUN='mean')
+# calculate the standard deviation
+mm_sd<-aggregate(mean~Behaviour_variable+Day+Trial,data = mean_sd,FUN='sd')
+# combine mean and sd into the same data frame
+mm<-data.frame(mm,mm_sd$mean)
+# change column name
+names(mm)[names(mm)=="mm_sd.mean"]<-'sd'
+
+# Calculate trial number by using 'Day' and 'Trial'
+day_trial2<-(mm$Day-1)*4+mm$Trial
+mm<-data.frame(mm,day_trial2)
+
+# plot line chart with regression line
+for (i in 1:8){
+  ss2<-mm[which(mm$Behaviour_variable==i),]
+  l1<-lm(ss2$mean~ss2$day_trial2)
+  plotline[[i]]<-ggplot(ss2,aes(x=day_trial2,y=mean))+
+    geom_line(key_glyph = draw_key_abline) + 
+  geom_point(size=1, key_glyph = draw_key_point) + 
+  geom_errorbar(aes(ymin = mean - sd/2, ymax = mean + sd/2), width = 0.1, key_glyph = draw_key_blank, linetype=2)+
+    #geom_smooth()+
+    #geom_abline(slope = l1$coefficients[[2]],intercept = l1$coefficients[[1]],color='red')+
+    labs(x="Trial",y=bv[i],subtitle =  paste("R2=",round(summary(l1)$r.squared,4),                                                "p.val=",round(summary(l1)$coefficients[8],4)))+
+    theme_classic()
+}
+
+library(ggpubr)
+#setwd("/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/place_cell_based_model_simulation/")
+ggsave(filename="/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/place_cell_based_model_simulation/Line_Trial~Behaviour_place_cell_model_variable_platform.png",plot=ggarrange(plotlist = plotline))
+#ggsave(filename = paste(colnames(fixed1)[j],'.png'),plot=ggarrange(plotlist=plot))
+```
+
+### By day
+```{r}
+# calculate the means over replicates (the mean of data with same Behaviour_variable&Day&Trial)
+mm<-aggregate(mean~Behaviour_variable+Day,data = mean_sd,FUN='mean')
+# calculate the standard deviation
+mm_sd<-aggregate(mean~Behaviour_variable+Day,data = mean_sd,FUN='sd')
+# combine mean and sd into the same data frame
+mm<-data.frame(mm,mm_sd$mean)
+# change column name
+names(mm)[names(mm)=="mm_sd.mean"]<-'sd'
+
+# plot line chart with regression line
+for (i in 1:8){
+  ss2<-mm[which(mm$Behaviour_variable==i),]
+  l1<-lm(ss2$mean~ss2$Day)
+  plotline[[i]]<-ggplot(ss2,aes(x=Day,y=mean))+
+    geom_line(key_glyph = draw_key_abline) + 
+  geom_point(size=1, key_glyph = draw_key_point) + 
+  geom_errorbar(aes(ymin = mean - sd/2, ymax = mean + sd/2), width = 0.1, key_glyph = draw_key_blank, linetype=2)+
+    #geom_smooth()+
+    #geom_abline(slope = l1$coefficients[[2]],intercept = l1$coefficients[[1]],color='red')+
+    labs(x="Day",y=bv[i],subtitle =  paste("R2=",round(summary(l1)$r.squared,4),                                                "p.val=",round(summary(l1)$coefficients[8],4)))+
+    theme_classic()
+}
+
+library(ggpubr)
+marrangeGrob(grobs = plotline,nrow = 4,ncol = 2)%>%
+  ggsave(paste('/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/data/Line_by_day_Trial~Behaviour_place_model_variable_platform.pdf'),
+         plot=.,width = 8,height = 10,device = 'pdf',dpi = 300)
+
+```
+
+```{r}
+# regression on sigma_pc~behavioural variables (single iteration, preparation for writing the following chunk of code)
+sigma_pc_a<-aggregate(value~sigma_pc+Behaviour_variable,data=fixed1,FUN='mean')
+plot3<-list()
+for (i in 1:8){
+  ss3<-sigma_pc_a[which(sigma_pc_a$Behaviour_variable==i),]
+  l<-lm(ss3$value~ss3$sigma_pc)
+#  print(summary(l)$r.squared)
+#  print(summary(l)$coefficients[8])
+  plot3[[i]]<-ggplot(ss3,aes(x=sigma_pc,y=value))+
+    geom_point()+
+    geom_abline(slope = l$coefficients[[2]],intercept = l$coefficients[[1]],color='red')+
+    labs(x="sigma_pc",y=bv[i],subtitle = paste("R^2=",round(summary(l)$r.squared,4),"p-value=",round(summary(l)$coefficients[8],4)))
+}
+ggarrange(plotlist=plot3)
+```
+
+```{r}
+# Regression on parameters ~ behavioural variables
+# iterate over all parameters
+setwd("~/Movies/lab/Gedi/Gedi0507")
+for(j in 7:18){
+      ss4<-aggregate(value~fixed1[,j]+Behaviour_variable,data=fixed1,FUN='mean')
+    plot<-list()
+  for (i in 1:8) {
+  ss5<-ss4[which(ss4$Behaviour_variable==i),]
+  l<-lm(ss5$value~ss5[,1])
+  summary(l)$r.square
+  plot[[i]]<-ggplot(ss5,aes(x=ss5[,1],y=value))+
+    geom_point()+
+    geom_abline(slope = l$coefficients[[2]],intercept = l$coefficients[[1]],color='red')+
+    labs(x=colnames(fixed1)[j],y=bv[i],subtitle =  paste("R2=",round(summary(l)$r.squared,4),                                                "p.val=",round(summary(l)$coefficients[8],4)))
+  }
+    ggsave(filename = paste(colnames(fixed1)[j],'.png'),plot=ggarrange(plotlist=plot))
+}
+```
+
+
+```{r}
+# regression on sigma_pc~behavioural variables (single iteration, preparation for writing the following chunk of code)
+sigma_pc_a<-aggregate(value~sigma_pc+Behaviour_variable,data=fixed1,FUN='mean')
+plot3<-list()
+for (i in 1:8){
+  ss3<-sigma_pc_a[which(sigma_pc_a$Behaviour_variable==i),]
+  l<-lm(ss3$value~ss3$sigma_pc)
+#  print(summary(l)$r.squared)
+#  print(summary(l)$coefficients[8])
+  plot3[[i]]<-ggplot(ss3,aes(x=sigma_pc,y=value))+
+    geom_point()+
+    geom_abline(slope = l$coefficients[[2]],intercept = l$coefficients[[1]],color='red')+
+    labs(x="sigma_pc",y=bv[i],subtitle = paste("R^2=",round(summary(l)$r.squared,4),"p-value=",round(summary(l)$coefficients[8],4)))
+}
+ggarrange(plotlist=plot3)
+```
+
+```{r}
+# Regression on parameters ~ behavioural variables
+# iterate over all parameters
+setwd("~/Movies/lab/Gedi/Gedi0507")
+for(j in 7:18){
+      ss4<-aggregate(value~fixed1[,j]+Behaviour_variable,data=fixed1,FUN='mean')
+    plot<-list()
+  for (i in 1:8) {
+  ss5<-ss4[which(ss4$Behaviour_variable==i),]
+  l<-lm(ss5$value~ss5[,1])
+  summary(l)$r.square
+  plot[[i]]<-ggplot(ss5,aes(x=ss5[,1],y=value))+
+    geom_point()+
+    geom_abline(slope = l$coefficients[[2]],intercept = l$coefficients[[1]],color='red')+
+    labs(x=colnames(fixed1)[j],y=bv[i],subtitle =  paste("R2=",round(summary(l)$r.squared,4),                                                "p.val=",round(summary(l)$coefficients[8],4)))
+  }
+    ggsave(filename = paste(colnames(fixed1)[j],'.png'),plot=ggarrange(plotlist=plot))
+}
+```
+
+
+
+###variable platform
+```{r}
+# Regression on fixed platform with trial ~ behavioural variable
+variable1<-read.csv("~/Movies/lab/Gedi/week3 material/7. add condition/output_variable1.csv")
+mean_rep1<-aggregate(value~Behaviour_variable+Day+Trial+pset,data=variable1,FUN='mean')
+sd_rep1<-aggregate(value~Behaviour_variable+Day+Trial+pset,data=variable1,FUN='sd')
+mean_sd1<-data.frame(mean_rep1,sd_rep1$value)
+names(mean_sd1)[names(mean_sd1) =="value"] <-"mean"
+names(mean_sd1)[names(mean_sd1) =="sd_rep.value"] <-"sd"
+plotbox<-list()
+plotline<-list()
+bv<-c( 'latency', 'distance', ' quandrant4', 'quadrant2','wall zone','speed_std','mean_angle','time step')
+library(ggpubr) # for ggsave function
+library(ggplot2)
+day_trial<-(mean_sd$Day-1)*4+mean_sd$Trial
+mean_sd1<-data.frame(mean_sd1,day_trial)
+for (i in 1:8){
+  ss<-mean_sd[which(mean_sd$Behaviour_variable==i),]
+  l<-lm(ss$mean~ss$Trial)
+  plotbox[[i]]<-ggplot(ss,aes(x=day_trial,y=mean,group=day_trial))+
+    geom_boxplot()+
+    labs(x="Trial",y=bv[i])+
+    geom_abline(slope = l$coefficients[[2]],intercept = l$coefficients[[1]],color='red')
+}
+```
+
+## Calculate Goodness of fit
+```{r}
+mm<-aggregate(mean~Behaviour_variable+Day+Trial,data = mean_sd,FUN='mean')
+mm_sd<-aggregate(mean~Behaviour_variable+Day+Trial,data = mean_sd,FUN='sd')
+mm<-data.frame(mm,mm_sd$mean)
+names(mm)[names(mm)=="mm_sd.mean"]<-'sd'
+day_trial2<-(mm$Day-1)*4+mm$Trial
+mm<-data.frame(mm,day_trial2)
+for (i in 1:8){
+  ss2<-mm[which(mm$Behaviour_variable==i),]
+  l<-lm(ss2$mean~ss2$day_trial2)
+  summary(l)$coefficients[8]
+  plotline[[i]]<-ggplot(ss2,aes(x=day_trial2,y=mean))+
+    geom_line(key_glyph = draw_key_abline) + 
+  geom_point(size=1, key_glyph = draw_key_point) + 
+  geom_errorbar(aes(ymin = mean - sd/2, ymax = mean + sd/2), width = 0.1, key_glyph = draw_key_blank, linetype=2)+
+    geom_abline(slope = l$coefficients[[2]],intercept = l$coefficients[[1]],color='red')+
+    labs(x="Trial",y=bv[i],subtitle =  paste("R2=",round(summary(l)$r.squared,4),                                                "p.val=",round(summary(l)$coefficients[8],4)))+
+    theme_classic()
+}
+library(ggpubr)
+setwd("~/Movies/lab/Gedi/Gedi0507/variable")
+ggsave(filename="Trial~Behaviour_variable_variable1.png",plot=ggarrange(plotlist = plotline))
+
+```
+```{r}
+# Regression on parameters ~ behavioural variables
+# iterate over all parameters
+setwd("~/Movies/lab/Gedi/Gedi0507/variable")
+for(j in 7:18){
+      ss4<-aggregate(value~fixed1[,j]+Behaviour_variable,data=fixed1,FUN='mean')
+    plot<-list()
+  for (i in 1:8) {
+  ss5<-ss4[which(ss4$Behaviour_variable==i),]
+  l<-lm(ss5$value~ss5[,1])
+  summary(l)$r.square
+  plot[[i]]<-ggplot(ss5,aes(x=ss5[,1],y=value))+
+    geom_point()+
+    geom_abline(slope = l$coefficients[[2]],intercept = l$coefficients[[1]],color='red')+
+    labs(x=colnames(fixed1)[j],y=bv[i],subtitle =  paste("R2=",round(summary(l)$r.squared,4),                                                "p.val=",round(summary(l)$coefficients[8],4)))
+  }
+    ggsave(filename = paste(colnames(fixed1)[j],'.png'),plot=ggarrange(plotlist=plot))
+}
+```
+
+## Calculate the mediam of R and p values with regression on each parameter set (animal data).
+```{r}
+r2_median<-c()
+pval_median<-c()
+for (i in 1:8){
+  r2<-c()
+  pval<-c()
+  for (j in 1:24) {
+    ss6<-mean_sd[which(mean_sd$Behaviour_variable==i&mean_sd$pset==j),]
+    l<-lm(ss6$mean~ss6$day_trial)
+    r2<-c(r2,summary(l)$r.squared)
+    pval<-c(pval,summary(l)$coefficients[8])
+  }
+   r2_median<-c(r2_median,median(r2))
+   pval_median<-c(pval_median,median(pval))
+}
+```
+
+```{r}
+gof_fixed<-read.csv("/Users/chenghui/Movies/lab/Gedi/Hua1707/all data - estimation/fixed_all_allgroup.csv")
+
+
+for (i in 7:17){
+  points(x=gof_fixed$sigma_pc[1:5],y=gof_fixed$chi2[1:5])
+}
+```
+
+## Building combined plot model & animal
+```{r}
+# Animal data
+WMdataLong <- read.csv("/Users/chenghui/Movies/lab/Gedi/week3 material/WMdataLong2.csv")
+day_trial<-(WMdataLong$Day-1)*4+WMdataLong$Trial
+datatype<-matrix(nrow = length(WMdataLong),ncol = 1)
+WMdataLongdt<-data.frame(WMdataLong,day_trial,datatype)
+names(WMdataLongdt)[1]<-'Behaviour_variable'
+WMdataLongdt$datatype[which(WMdataLongdt$Strain==1&WMdataLongdt$Temperature==18)]<-'C57BL/6_18'
+WMdataLongdt$datatype[which(WMdataLongdt$Strain==1&WMdataLongdt$Temperature==26)]<-'C57BL/6_26'
+WMdataLongdt$datatype[which(WMdataLongdt$Strain==2&WMdataLongdt$Temperature==18)]<-'DBA/2_18'
+WMdataLongdt$datatype[which(WMdataLongdt$Strain==2&WMdataLongdt$Temperature==26)]<-'DBA/2_26'
+WMdataLongdt$datatype<-as.factor(WMdataLongdt$datatype)
+animal_data<-WMdataLongdt[,c(1,4,5,6,7,8,9,10)]
+animal_datac<-animal_data[which(animal_data$Behaviour_variable==1|animal_data$Behaviour_variable==2|animal_data$Behaviour_variable==3|animal_data$Behaviour_variable==5|animal_data$Behaviour_variable==7|animal_data$Behaviour_variable==11|animal_data$Behaviour_variable==12),]
+animal_datac$Behaviour_variable[which(animal_datac$Behaviour_variable==5)]<-4
+animal_datac$Behaviour_variable[which(animal_datac$Behaviour_variable==3)]<-5
+animal_datac$Behaviour_variable[which(animal_datac$Behaviour_variable==2)]<-3
+animal_datac$Behaviour_variable[which(animal_datac$Behaviour_variable==7)]<-2
+animal_datac$Behaviour_variable[which(animal_datac$Behaviour_variable==11)]<-7
+animal_datac$Behaviour_variable[which(animal_datac$Behaviour_variable==12)]<-6
+animal_datac$Value[which(animal_datac$Behaviour_variable==7)]<-animal_datac$Value[which(animal_datac$Behaviour_variable==7)]/12.5
+
+# 调整behavioural variable 的编号
+# aggregate
+animal_dataca = aggregate(Value~Behaviour_variable+Condition+Day+Trial+day_trial+datatype,data=animal_datac,FUN = 'mean')
+animal_datacsd = aggregate(Value~Behaviour_variable+Condition+Day+Trial+day_trial+datatype,data=animal_datac,FUN = 'sd')
+animal_datacf=data.frame(animal_dataca,'sd'=animal_datacsd$Value)
+
+```
+##Distance-based model
+```{r}
+# model data
+fixed1<-read.csv("/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/distance_based_model_random_simulation/output_fixed_1000trial.csv",header = F)
+header = c('Behaviour_variable','Day','Trial','pset','value')
+colnames(fixed1)=header 
+mean_rep<-aggregate(value~Behaviour_variable+Day+Trial,data=fixed1,FUN='mean')
+sd_rep<-aggregate(value~Behaviour_variable+Day+Trial,data=fixed1,FUN='sd')
+mean_sd<-data.frame(mean_rep,sd_rep$value)
+names(mean_sd)[names(mean_sd) =="value"] <-"mean"
+names(mean_sd)[names(mean_sd) =="sd_rep.value"] <-"sd"
+day_trial<-(mean_sd$Day-1)*4+mean_sd$Trial
+mean_sd<-data.frame(mean_sd,day_trial)
+datatype<-rep("DC_model",length(mean_sd$Behaviour_variable))
+mean_sd<-data.frame(mean_sd,datatype)
+mean_model<-mean_sd
+colnames(mean_model)[4]<-'Value'
+colnames(mean_model)[5]<-'sd'
+Condition<-rep(1,length(mean_model$Behaviour_variable))
+distance_model_fixed<-data.frame(mean_model,Condition)
+```
+
+```{r}
+variable1<-read.csv("/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/distance_based_model_random_simulation/output_variable_1000trial.csv",header = F)
+header = c('Behaviour_variable','Day','Trial','pset','value')
+colnames(variable1)=header 
+mean_rep<-aggregate(value~Behaviour_variable+Day+Trial,data=variable1,FUN='mean')
+sd_rep<-aggregate(value~Behaviour_variable+Day+Trial,data=variable1,FUN='sd')
+mean_sd<-data.frame(mean_rep,sd_rep$value)
+names(mean_sd)[names(mean_sd) =="value"] <-"mean"
+names(mean_sd)[names(mean_sd) =="sd_rep.value"] <-"sd"
+day_trial<-(mean_sd$Day-1)*4+mean_sd$Trial
+mean_sd<-data.frame(mean_sd,day_trial)
+datatype<-rep("DC_model",length(mean_sd$Behaviour_variable))
+mean_sd<-data.frame(mean_sd,datatype)
+mean_model<-mean_sd
+colnames(mean_model)[4]<-'Value'
+colnames(mean_model)[5]<-'sd'
+Condition<-rep(2,length(mean_model$Behaviour_variable))
+distance_model_variable<-data.frame(mean_model,Condition)
+```
+
+##Place cell-based model
+```{r}
+# model data
+fixed2<-read.csv("/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/place_cell_based_model_simulation/output_fix_1000trial.csv",header = F)
+header = c('Behaviour_variable','Day','Trial','pset','value')
+colnames(fixed2)=header 
+mean_rep<-aggregate(value~Behaviour_variable+Day+Trial,data=fixed2,FUN='mean')
+sd_rep<-aggregate(value~Behaviour_variable+Day+Trial,data=fixed2,FUN='sd')
+mean_sd<-data.frame(mean_rep,sd_rep$value)
+names(mean_sd)[names(mean_sd) =="value"] <-"mean"
+names(mean_sd)[names(mean_sd) =="sd_rep.value"] <-"sd"
+day_trial<-(mean_sd$Day-1)*4+mean_sd$Trial
+mean_sd<-data.frame(mean_sd,day_trial)
+datatype<-rep("PC_model",length(mean_sd$Behaviour_variable))
+mean_sd<-data.frame(mean_sd,datatype)
+mean_model<-mean_sd
+colnames(mean_model)[4]<-'Value'
+colnames(mean_model)[5]<-'sd'
+Condition<-rep(1,length(mean_model$Behaviour_variable))
+place_model_fixed<-data.frame(mean_model,Condition)
+```
+
+```{r}
+variable2<-read.csv("/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/place_cell_based_model_simulation/output_variable_1000trial.csv")
+header = c('Behaviour_variable','Day','Trial','pset','value')
+colnames(variable2)=header 
+mean_rep<-aggregate(value~Behaviour_variable+Day+Trial,data=variable2,FUN='mean')
+sd_rep<-aggregate(value~Behaviour_variable+Day+Trial,data=variable2,FUN='sd')
+mean_sd<-data.frame(mean_rep,sd_rep$value)
+names(mean_sd)[names(mean_sd) =="value"] <-"mean"
+names(mean_sd)[names(mean_sd) =="sd_rep.value"] <-"sd"
+day_trial<-(mean_sd$Day-1)*4+mean_sd$Trial
+mean_sd<-data.frame(mean_sd,day_trial)
+datatype<-rep("PC_model",length(mean_sd$Behaviour_variable))
+mean_sd<-data.frame(mean_sd,datatype)
+mean_model<-mean_sd
+colnames(mean_model)[4]<-'Value'
+colnames(mean_model)[5]<-'sd'
+Condition<-rep(2,length(mean_model$Behaviour_variable))
+place_model_variable<-data.frame(mean_model,Condition)
+```
+
+```{r}
+alldata<-rbind(distance_model_fixed,distance_model_variable,place_model_fixed,place_model_variable,animal_datacf)
+
+alldata$Value[which(alldata$Behaviour_variable==2&alldata$datatype=='DC_model')]<-alldata$Value[which(alldata$Behaviour_variable==2&alldata$datatype=='DC_model')]*100
+#alldata$Value[which(alldata$Behaviour_variable==7&alldata$datatype=='DC_model')]<-alldata$Value[which(alldata$Behaviour_variable==7&alldata$datatype=='DC_model')]/12.5
+#alldata$Value[which(alldata$Behaviour_variable==7&alldata$datatype!='DC_model'&alldata$datatype!='PC_model')]<-alldata$Value[which(alldata$Behaviour_variable==7&alldata$datatype!='DC_model'&alldata$datatype!='PC_model')]*12.5
+
+alldata$Value[which(alldata$Behaviour_variable==3&alldata$datatype!='DC_model'&alldata$datatype!='PC_model')]<-alldata$Value[which(alldata$Behaviour_variable==3&alldata$datatype!='DC_model'&alldata$datatype!='PC_model')]*100
+alldata$Value[which(alldata$Behaviour_variable==4&alldata$datatype!='DC_model'&alldata$datatype!='PC_model')]<-alldata$Value[which(alldata$Behaviour_variable==4&alldata$datatype!='DC_model'&alldata$datatype!='PC_model')]*100
+alldata$Value[which(alldata$Behaviour_variable==5&alldata$datatype!='DC_model'&alldata$datatype!='PC_model')]<-alldata$Value[which(alldata$Behaviour_variable==5&alldata$datatype!='DC_model'&alldata$datatype!='PC_model')]*100
+
+alldata$Value[which(alldata$Behaviour_variable==2&alldata$datatype=='PC_model')]<-alldata$Value[which(alldata$Behaviour_variable==2&alldata$datatype=='PC_model')]*100
+#alldata$Value[which(alldata$Behaviour_variable==7&alldata$datatype=='PC_model')]<-alldata$Value[which(alldata$Behaviour_variable==7&alldata$datatype=='PC_model')]/12.5
+
+platform<-c('fixed platform','variable platform')
+bv<-c( 'latency', 'distance', 'target quadrant', 'opposite quadrant','wall zone','speed_std','mean_angle','time step')
+setwd('/Users/chenghui/Movies/lab/Gedi/Gedi0726/combined_plot')
+library(ggplot2)
+library(ggpubr)
+plot<-list()
+for (j in 1:2) {
+  for (i in 1:6) {
+  ss1<-alldata[which(alldata$Behaviour_variable==i&alldata$Condition==j),]
+  ss2<-aggregate(Value~day_trial+datatype,data = ss1,FUN = 'mean')
+  ss3<-aggregate(Value~day_trial+datatype,data = ss1,FUN = 'sd')
+  ss4<-data.frame(ss2,ss3$Value)
+  names(ss4)[4]<-'sd'
+  plot[[(j-1)*6+i]]<-ggplot(ss4,aes(x=day_trial,y=Value))+
+    geom_line(aes(color=datatype))+
+    geom_errorbar(aes(ymin=Value-sd/2,ymax=Value+sd/2,color=datatype))+
+    #labs(title = platform[j])+
+    ylab(bv[i])+
+    theme_classic()
+  #ggsave(paste(platform[j],bv[i],'.png'),plot = p)
+  }
+}
+library(gridExtra)
+marrangeGrob(grobs = plot,nrow = 3,ncol = 2)%>%
+  ggsave(paste('/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/data/PMs.pdf'),
+         plot=.,width = 10,height = 8,device = 'pdf',dpi = 300)
+
+# By day
+plot<-list()
+for (j in 1:2) {
+  for (i in 1:6) {
+  ss1<-alldata[which(alldata$Behaviour_variable==i&alldata$Condition==j),]
+  ss2<-aggregate(Value~Day+datatype,data = ss1,FUN = 'mean')
+  ss3<-aggregate(Value~Day+datatype,data = ss1,FUN = 'sd')
+  ss4<-data.frame(ss2,ss3$Value)
+  names(ss4)[4]<-'sd'
+  plot[[(j-1)*6+i]]<-ggplot(ss4,aes(x=Day,y=Value))+
+    geom_line(aes(color=datatype))+
+    geom_errorbar(aes(ymin=Value-sd/2,ymax=Value+sd/2,color=datatype), width = 0.1, key_glyph = draw_key_blank, linetype=2)+
+    #labs(title = platform[j])+
+    ylab(bv[i])+
+    theme_classic()
+  #ggsave(paste(platform[j],bv[i],'.png'),plot = p)
+  }
+}
+
+library(gridExtra)
+marrangeGrob(grobs = plot,nrow = 3,ncol = 2)%>%
+  ggsave(paste('/Users/chenghui/Documents/CBSB3/ICA/Water_Maze_Modelling/data/PMs_by_day.pdf'),
+         plot=.,width = 10,height = 8,device = 'pdf',dpi = 300)
+
+```
+
+## Parameter estimation
+By plotting parameter ~ gof (data from runmod_random), we try to identify the best parameter range to start estimation. Data used is from Hua's fixed_all_allgroup.csv.
+```{r}
+# beta
+fix<-read.csv("~/Movies/lab/Gedi/Hua1707/all data - estimation/fixed_all_allgroup.csv")
+day_trial<-(fix$day-1)*4+fix$trial
+fix<-data.frame(fix,day_trial)
+
+beta<-data.frame(fix$beta,fix$gof,fix$mouse,fix$day_trial,fix$Temp)
+betaa<-beta%>%arrange(fix.gof)
+bs<-seq(0.5001,12.0000,length.out = 50)
+result<-data.frame()
+for(i in 1:(length(bs)-1)){
+  ss<-betaa[which(betaa$fix.beta>=bs[i]&betaa$fix.beta<bs[i+1]),]
+  mini<-ss[1,]
+  med<-ss[round(length(ss$fix.beta)/2),]
+  p20<-ss[round(length(ss$fix.beta)*0.2),]  
+  ss1<-rbind(mini,med,p20)
+  label<-c('min','median','20 percent')
+  ss2<-cbind(ss1,label)
+  result<-rbind(result,ss2)
+}
+library(ggplot2)
+ggplot(result,aes(x=fix.beta,y=fix.gof,color=label))+
+  geom_point()+
+  geom_smooth()+
+  theme_classic()
+
+beta1<-aggregate(fix.gof~fix.mouse+fix.day_trial+fix.Temp,data=beta,FUN = 'min')
+library(dplyr)
+beta2<-dplyr::left_join(beta1,beta)
+summary(beta)
+  # lower and upper bound
+mes=c()
+xs=c()
+for (i in 1:99){
+  xs=c(xs,mean(c(bs[i],bs[i+1])))
+  betss<-beta2[which(beta2$fix.beta>=bs[i]&beta2$fix.beta<bs[i+1]),]
+  me=median(betss$fix.gof)
+  mes<-c(mes,me)
+}
+xs<-c(xs) # 10th best of all cases, the best case
+mes<-c(mes)
+plot(xs,mes,xlab = 'beta',ylab = 'meidan of gof',pch=16)
+
+```
+```{r}
+# gamma
+gamma<-data.frame(fix$gamma,fix$gof)
+summary(gamma)
+as<-seq(0.75,0.95,length.out = 100)
+mes=c()
+xs=c()
+for (i in 1:99){
+  xs=c(xs,mean(c(as[i],as[i+1])))
+  gammas<-gamma[which(gamma$fix.gamma>=as[i]&gamma$fix.gamma<as[i+1]),]
+  me=median(gammas$fix.gof)
+  mes<-c(mes,me)
+}
+xs<-c(xs,0.010492635,0.0082558)
+mes<-c(mes,0.2972986,0.087702)
+plot(xs,mes,xlab = 'gamma',ylab = 'meidan of gof',pch=16)
+```
+```{r}
+gamma<-data.frame(fix$gamma,fix$gof,fix$mouse,fix$day_trial,fix$Temp)
+gammaa<-gamma%>%arrange(fix.gof)
+bs<-seq(0.75,0.95,length.out = 50)
+result<-data.frame()
+for(i in 1:(length(bs)-1)){
+  ss<-gammaa[which(gammaa$fix.gamma>=bs[i]&gammaa$fix.gamma<bs[i+1]),]
+  mini<-ss[1,]
+  med<-ss[round(length(ss$fix.gof)/2),]
+  p20<-ss[round(length(ss$fix.gof)*0.2),]  
+  ss1<-rbind(mini,med,p20)
+  label<-c('min','median','20 percent')
+  ss2<-cbind(ss1,label)
+  result<-rbind(result,ss2)
+}
+ggplot(result,aes(x=fix.gamma,y=fix.gof,color=label))+
+  geom_point()+
+  geom_smooth()+
+  theme_classic()
+```
+```{r}
+alpha<-data.frame(fix$alpha,fix$gof,fix$mouse,fix$day_trial,fix$Temp)
+alpha1<-aggregate(fix.gof~fix.mouse+fix.day_trial+fix.Temp,data=alpha,FUN = 'min')
+library(dplyr)
+alpha2<-dplyr::left_join(alpha1,alpha)
+summary(alpha)
+bs<-seq(0.005,0.02,length.out = 100)  # lower and upper bound
+mes=c()
+xs=c()
+for (i in 1:99){
+  xs=c(xs,mean(c(bs[i],bs[i+1])))
+  betss<-alpha2[which(alpha2$fix.alpha>=bs[i]&alpha2$fix.alpha<bs[i+1]),]
+  me=median(betss$fix.gof)
+  mes<-c(mes,me)
+}
+xs<-c(xs) # 10th best of all cases, the best case
+mes<-c(mes)
+plot(xs,mes,xlab = 'alpha',ylab = 'meidan of gof',pch=16)
+```
+```{r}
+alpha<-data.frame(fix$alpha,fix$gof,fix$mouse,fix$day_trial,fix$Temp)
+alphaa<-alpha%>%arrange(fix.gof)
+bs<-seq(0.005,0.02,length.out = 50)
+result<-data.frame()
+for(i in 1:(length(bs)-1)){
+  ss<-alphaa[which(alphaa$fix.alpha>=bs[i]&alphaa$fix.alpha<bs[i+1]),]
+  mini<-ss[1,]
+  med<-ss[round(length(ss$fix.gof)/2),]
+  p20<-ss[round(length(ss$fix.gof)*0.2),]  
+  ss1<-rbind(mini,med,p20)
+  label<-c('min','median','20 percent')
+  ss2<-cbind(ss1,label)
+  result<-rbind(result,ss2)
+}
+ggplot(result,aes(x=fix.alpha,y=fix.gof,color=label))+
+  geom_point()+
+  geom_smooth()+
+  theme_classic()
+```
+```{r}
+# gamma
+gamma<-data.frame(fix$gamma,fix$gof)
+summary(gamma)
+gs<-seq(0.75,0.95,length.out = 100)
+mes=c()
+xs=c()
+for (i in 1:99){
+  xs=c(xs,mean(c(gs[i],gs[i+1])))
+  gammas<-gamma[which(gamma$fix.gamma>=gs[i]&gamma$fix.gamma<gs[i+1]),]
+  me=median(gammas$fix.gof)
+  mes<-c(mes,me)
+}
+xs<-c(xs,0.8550855,0.78274)
+mes<-c(mes,0.2972986,0.087702)
+plot(xs,mes,xlab = 'gamma',ylab = 'meidan of gof',pch=16)
+```
+
+```{r}
+gamma<-data.frame(fix$gamma,fix$gof,fix$mouse,fix$day_trial,fix$Temp)
+gamma1<-aggregate(fix.gof~fix.mouse+fix.day_trial+fix.Temp,data=gamma,FUN = 'min')
+library(dplyr)
+gamma2<-dplyr::left_join(gamma1,gamma)
+summary(gamma)
+bs<-seq(0.75,0.95,length.out = 100)  # lower and upper bound
+mes=c()
+xs=c()
+for (i in 1:99){
+  xs=c(xs,mean(c(bs[i],bs[i+1])))
+  betss<-gamma2[which(gamma2$fix.gamma>=bs[i]&gamma2$fix.gamma<bs[i+1]),]
+  me=median(betss$fix.gof)
+  mes<-c(mes,me)
+}
+xs<-c(xs) # 10th best of all cases, the best case
+mes<-c(mes)
+plot(xs,mes,xlab = 'gamma',ylab = 'meidan of gof',pch=16)
+```
+
+```{r}
+# vdecay
+vdecay<-data.frame(fix$Vdecay,fix$gof)
+summary(vdecay)
+vs<-seq(0.8,0.93,length.out = 100)
+mes=c()
+xs=c()
+for (i in 1:99){
+  xs=c(xs,mean(c(vs[i],vs[i+1])))
+  vdecays<-vdecay[which(vdecay$fix.Vdecay>=vs[i]&vdecay$fix.Vdecay<vs[i+1]),]
+  me=median(vdecays$fix.gof)
+  mes<-c(mes,me)
+}
+xs<-c(xs,0.8526285,0.88611)
+mes<-c(mes,0.2972986,0.087702)
+plot(xs,mes,xlab = 'vdecay',ylab = 'meidan of gof',pch=16)
+```
+```{r}
+vdecay<-data.frame(fix$Vdecay,fix$gof,fix$mouse,fix$day_trial,fix$Temp)
+vdecaya<-vdecay%>%arrange(fix.gof)
+bs<-seq(0.8,0.93,length.out = 50)
+result<-data.frame()
+for(i in 1:(length(bs)-1)){
+  ss<-vdecaya[which(vdecaya$fix.Vdecay>=bs[i]&vdecaya$fix.Vdecay<bs[i+1]),]
+  mini<-ss[1,]
+  med<-ss[round(length(ss$fix.gof)/2),]
+  p20<-ss[round(length(ss$fix.gof)*0.2),]  
+  ss1<-rbind(mini,med,p20)
+  label<-c('min','median','20 percent')
+  ss2<-cbind(ss1,label)
+  result<-rbind(result,ss2)
+}
+ggplot(result,aes(x=fix.Vdecay,y=fix.gof,color=label))+
+  geom_point()+
+  geom_smooth()+
+  theme_classic()
+```
+```{r}
+vdecay<-data.frame(fix$Vdecay,fix$gof,fix$mouse,fix$day_trial,fix$Temp)
+vdecay1<-aggregate(fix.gof~fix.mouse+fix.day_trial+fix.Temp,data=vdecay,FUN = 'min')
+library(dplyr)
+vdecay2<-dplyr::left_join(vdecay1,vdecay)
+summary(vdecay)
+bs<-seq(0.8,0.93,length.out = 100)  # lower and upper bound
+mes=c()
+xs=c()
+for (i in 1:99){
+  xs=c(xs,mean(c(bs[i],bs[i+1])))
+  betss<-vdecay2[which(vdecay2$fix.Vdecay>=bs[i]&vdecay2$fix.Vdecay<bs[i+1]),]
+  me=median(betss$fix.gof)
+  mes<-c(mes,me)
+}
+xs<-c(xs) # 10th best of all cases, the best case
+mes<-c(mes)
+plot(xs,mes,xlab = 'vdecay',ylab = 'meidan of gof',pch=16)
+```
+
+```{r}
+# sigma_pc
+sigmapc<-data.frame(fix$sigma_pc,fix$gof)
+summary(sigmapc)
+ss<-seq(0.1,0.2,length.out = 100)
+mes=c()
+xs=c()
+for (i in 1:99){
+  xs=c(xs,mean(c(ss[i],ss[i+1])))
+  sigmapcs<-sigmapc[which(sigmapc$fix.sigma_pc>=ss[i]&sigmapc$fix.sigma_pc<ss[i+1]),]
+  me=median(sigmapcs$fix.gof)
+  mes<-c(mes,me)
+}
+xs<-c(xs,0.1359005,0.10192)
+mes<-c(mes,0.2972986,0.087702)
+plot(xs,mes,xlab = 'vdecay',ylab = 'meidan of gof',pch=16)
+
+```
+```{r}
+sigmapc<-data.frame(fix$sigma_pc,fix$gof,fix$mouse,fix$day_trial,fix$Temp)
+sigmapca<-sigmapc%>%arrange(fix.gof)
+bs<-seq(0.1,0.2,length.out = 50)
+result<-data.frame()
+for(i in 1:(length(bs)-1)){
+  ss<-sigmapca[which(sigmapca$fix.sigma_pc>=bs[i]&sigmapca$fix.sigma_pc<bs[i+1]),]
+  mini<-ss[1,]
+  med<-ss[round(length(ss$fix.gof)/2),]
+  p20<-ss[round(length(ss$fix.gof)*0.2),]  
+  ss1<-rbind(mini,med,p20)
+  label<-c('min','median','20 percent')
+  ss2<-cbind(ss1,label)
+  result<-rbind(result,ss2)
+}
+ggplot(result,aes(x=fix.sigma_pc,y=fix.gof,color=label))+
+  geom_point()+
+  geom_smooth()+
+  theme_classic()
+```
+
+```{r}
+sigmapc<-data.frame(fix$sigma_pc,fix$gof,fix$mouse,fix$day_trial,fix$Temp)
+sigmapc1<-aggregate(fix.gof~fix.mouse+fix.day_trial+fix.Temp,data=sigmapc,FUN = 'min')
+library(dplyr)
+sigmapc2<-dplyr::left_join(sigmapc1,sigmapc)
+summary(sigmapc)
+bs<-seq(0.1,0.3,length.out = 100)  # lower and upper bound
+mes=c()
+xs=c()
+for (i in 1:99){
+  xs=c(xs,mean(c(bs[i],bs[i+1])))
+  betss<-sigmapc2[which(sigmapc2$fix.sigma_pc>=bs[i]&sigmapc2$fix.sigma_pc<bs[i+1]),]
+  me=median(betss$fix.gof)
+  mes<-c(mes,me)
+}
+xs<-c(xs) # 10th best of all cases, the best case
+mes<-c(mes)
+plot(xs,mes,xlab = 'sigmapc',ylab = 'meidan of gof',pch=16)
+```
+```{r}
+# ac_const
+acconst<-data.frame(fix$ac_const,fix$gof)
+summary(acconst)
+as<-seq(0.01,0.03,length.out = 100)
+mes=c()
+xs=c()
+for (i in 1:99){
+  xs=c(xs,mean(c(as[i],as[i+1])))
+  acconsts<-acconst[which(acconst$fix.ac_const>=as[i]&acconst$fix.ac_const<as[i+1]),]
+  me=median(acconsts$fix.gof)
+  mes<-c(mes,me)
+}
+xs<-c(xs,0.0172469,0.016279)
+mes<-c(mes,0.2972986,0.087702)
+plot(xs,mes,xlab = 'ac_const',ylab = 'meidan of gof',pch=16)
+
+```
+```{r}
+acconst<-data.frame(fix$ac_const,fix$gof,fix$mouse,fix$day_trial,fix$Temp)
+acconst1<-aggregate(fix.gof~fix.mouse+fix.day_trial+fix.Temp,data=acconst,FUN = 'min')
+library(dplyr)
+acconst2<-dplyr::left_join(acconst1,acconst)
+summary(acconst)
+bs<-seq(0.01,0.03,length.out = 100)  # lower and upper bound
+mes=c()
+xs=c()
+for (i in 1:99){
+  xs=c(xs,mean(c(bs[i],bs[i+1])))
+  betss<-acconst2[which(acconst2$fix.ac_const>=bs[i]&acconst2$fix.ac_const<bs[i+1]),]
+  me=median(betss$fix.gof)
+  mes<-c(mes,me)
+}
+xs<-c(xs) # 10th best of all cases, the best case
+mes<-c(mes)
+plot(xs,mes,xlab = 'acconst',ylab = 'meidan of gof',pch=16)
+```
+```{r}
+acconst<-data.frame(fix$ac_const,fix$gof,fix$mouse,fix$day_trial,fix$Temp)
+acconsta<-acconst%>%arrange(fix.gof)
+bs<-seq(0.01,0.03,length.out = 50)
+result<-data.frame()
+for(i in 1:(length(bs)-1)){
+  ss<-acconsta[which(acconsta$fix.ac_const>=bs[i]&acconsta$fix.ac_const<bs[i+1]),]
+  mini<-ss[1,]
+  med<-ss[round(length(ss$fix.gof)/2),]
+  p20<-ss[round(length(ss$fix.gof)*0.2),]  
+  ss1<-rbind(mini,med,p20)
+  label<-c('min','median','20 percent')
+  ss2<-cbind(ss1,label)
+  result<-rbind(result,ss2)
+}
+ggplot(result,aes(x=fix.ac_const,y=fix.gof,color=label))+
+  geom_point()+
+  geom_smooth()+
+  theme_classic()
+```
